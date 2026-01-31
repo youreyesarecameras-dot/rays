@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Bouncing Shapes</title>
+<style>
+  html, body {
+    margin: 0;
+    overflow: hidden;
+    background: #111;
+    font-family: sans-serif;
+  }
+  #ui {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    background: rgba(0,0,0,0.7);
+    padding: 10px;
+    border-radius: 8px;
+    color: white;
+    font-size: 12px;
+  }
+  select, input, button {
+    margin-top: 4px;
+    width: 150px;
+  }
+  button {
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+
+<div id="ui">
+  <select id="shape">
+    <option>Circle</option>
+    <option>Semi-circle</option>
+    <option>Triangle</option>
+    <option>Square</option>
+    <option>Pentagon</option>
+    <option>Hexagon</option>
+    <option>Heptagon</option>
+    <option>Octagon</option>
+    <option>Nonagon</option>
+    <option>Decagon</option>
+  </select>
+
+  <select id="color">
+    <option>Red</option>
+    <option>Orange</option>
+    <option>Yellow</option>
+    <option>Green</option>
+    <option>Blue</option>
+    <option>Purple</option>
+    <option>Black</option>
+    <option>White</option>
+    <option>Pink</option>
+    <option>Brown</option>
+    <option>Gray</option>
+    <option>Monochrome</option>
+    <option>Rainbow</option>
+  </select>
+
+
+
+  <select id="size">
+    <option>Small</option>
+    <option>Medium</option>
+    <option>Large</option>
+    <option>Changing</option>
+  </select>
+
+  <button onclick="spawnFromUI()">Spawn Shape</button>
+  <button onclick="deleteAll()">Delete All Shapes</button>
+</div>
+
+<script>
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+resize();
+window.addEventListener("resize", resize);
+
+function resize() {
+  canvas.width = innerWidth;
+  canvas.height = innerHeight;
+}
+
+const shapes = [];
+const TWO_PI = Math.PI * 2;
+
+class Shape {
+  constructor(x, y, sides, color, size, opts = {}) {
+    this.x = x;
+    this.y = y;
+    this.vx = (Math.random() - 0.5) * 4;
+    this.vy = (Math.random() - 0.5) * 4;
+    this.sides = sides;
+    this.baseSize = size;
+    this.size = size;
+    this.t = Math.random() * 100;
+    this.color = color;
+    this.opts = opts;
+    this.immune = opts.immune || false;
+
+    // 🔥 FIX: rotation so shapes are upright
+    this.rotation = -Math.PI / 2;
+  }
+
+  update() {
+    this.x += this.vx;
+    this.y += this.vy;
+
+    if (this.x < this.size || this.x > canvas.width - this.size) this.vx *= -1;
+    if (this.y < this.size || this.y > canvas.height - this.size) this.vy *= -1;
+
+    if (this.opts.changingSize) {
+      this.size = this.baseSize * (0.7 + Math.sin(this.t) * 0.3);
+    }
+
+    this.t += 0.05;
+  }
+
+  getColor() {
+    if (this.opts.rainbow) {
+      return `hsl(${(this.t * 40) % 360},100%,50%)`;
+    }
+    if (this.opts.monochrome) {
+      const v = Math.floor((Math.sin(this.t) + 1) * 127);
+      return `rgb(${v},${v},${v})`;
+    }
+    if (this.opts.blueGreen) {
+      const g = Math.floor((Math.sin(this.t) + 1) * 127);
+      return `rgb(0,${g},255)`;
+    }
+    return this.color;
+  }
+
+  draw() {
+    ctx.fillStyle = this.getColor();
+    ctx.beginPath();
+
+    if (this.sides === "circle") {
+      ctx.arc(this.x, this.y, this.size, 0, TWO_PI);
+    } 
+    else if (this.sides === "semi") {
+      ctx.arc(this.x, this.y, this.size, 0, Math.PI);
+    } 
+    else {
+      const n = this.sides;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * TWO_PI + this.rotation;
+        const px = this.x + Math.cos(a) * this.size;
+        const py = this.y + Math.sin(a) * this.size;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+    }
+
+    ctx.fill();
+  }
+}
+
+function collide(a, b) {
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist < a.size + b.size) {
+    [a.vx, b.vx] = [b.vx, a.vx];
+    [a.vy, b.vy] = [b.vy, a.vy];
+  }
+}
+
+function loop() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  for (let i = 0; i < shapes.length; i++) {
+    for (let j = i + 1; j < shapes.length; j++) {
+      collide(shapes[i], shapes[j]);
+    }
+  }
+
+  shapes.forEach(s => {
+    s.update();
+    s.draw();
+  });
+
+  requestAnimationFrame(loop);
+}
+
+function spawn(shape, color, size, opts = {}) {
+  shapes.push(new Shape(
+    Math.random() * canvas.width,
+    Math.random() * canvas.height,
+    shape,
+    color,
+    size,
+    opts
+  ));
+}
+
+// DEFAULT SHAPES
+spawn(4, "yellow", 30);
+spawn(3, "blue", 35, { blueGreen: true });
+spawn("circle", "orange", 40, { changingSize: true });
+spawn(4, "red", 45, { rainbow: true, changingSize: true });
+spawn(5, "pink", 35);
+
+// IMMUNE RHOMBUS
+spawn(4, "#4EA809", 2, { immune: true });
+
+// UI
+function spawnFromUI() {
+  const shapeMap = {
+    Circle: "circle",
+    "Semi-circle": "semi",
+    Triangle: 3,
+    Square: 4,
+    Rectangle: 4,
+    Pentagon: 5,
+    Hexagon: 6,
+    Heptagon: 7,
+    Octagon: 8,
+    Nonagon: 9,
+    Decagon: 10
+  };
+
+  const s = shapeMap[shape.value];
+  let c = color.value.toLowerCase();
+  const opts = {};
+
+  if (color.value === "Rainbow") opts.rainbow = true;
+  if (color.value === "Monochrome") opts.monochrome = true;
+
+  const sizeMap = { Small: 15, Medium: 30, Large: 50, Changing: 35 };
+  if (size.value === "Changing") opts.changingSize = true;
+
+  spawn(s, c, sizeMap[size.value], opts);
+}
+
+function deleteAll() {
+  for (let i = shapes.length - 1; i >= 0; i--) {
+    if (!shapes[i].immune) shapes.splice(i, 1);
+  }
+}
+
+loop();
+</script>
+</body>
+</html>
+
